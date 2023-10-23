@@ -99,6 +99,7 @@ wss.on('connection', function connection(ws, req, clt) {
 
         if(message["protocol"] == 'GAMEOVER'){
             const user_room = users[user].room;
+            room_broadcast(user_room, {protocol: "GAMEOVER", player: user})
             const user_turn = turn_per_room[user_room].indexOf(user)
             turn_per_room[user_room].splice(user_turn,1)
             if(!user_turn) nextTurn(user_room)
@@ -148,6 +149,20 @@ wss.on('connection', function connection(ws, req, clt) {
 
             }
         }
+
+        if(message["protocol"] == 'OBSTACLE_ACTION'){
+            const user_room = users[user].room;
+            // Se for a carta de esquema de pirâmide
+            if(message["card_id"] >= 26 && message["card_id"] <= 30 ){
+                room_broadcast(user_room, {protocol: "OBSTACLE_ACTION", action: "ADD_PYRAMID", player: user})
+            }
+        }
+
+        if(message["protocol"] == 'PYRAMID_DISSOLVE'){
+            const user_room = users[user].room;
+            room_broadcast(user_room, {protocol: "PYRAMID_DISSOLVE"}, user)
+        }
+
     });
 
     ws.on('close', () => {
@@ -210,7 +225,8 @@ app.get('/turno/:room', (req, res) => {
 
     let cards = [...obstacles, ...action_cards]
     cards = shuffle(cards)
-    cards.push(84) //DEBUG
+    cards.push(27) //DEBUG
+    cards.push(28) //DEBUG
     cards_per_room[room] = cards
 
     turn_per_room[room] = shuffle(Object.keys(rooms[room]))
