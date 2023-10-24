@@ -28,14 +28,15 @@ function shuffle(array) {
     return array;
 }
 
+// If the last player is somewhere in the next turns, delete the last player from the turn buffer
 function returnToNormalTurn(turn) {
-    const scanned = [];
-    turn.reverse().forEach((player) => {
-        if(!scanned.includes(player)){
-            scanned.push(player);
+    const last_player = turn[1]
+    turn.forEach((player, index) => {
+        if(index > 1 && player === last_player){
+            turn.splice(1,1)
         }
     });
-    return scanned.reverse()
+    return turn
 }
 
 module.exports = {generateRoomId, shuffle, returnToNormalTurn}

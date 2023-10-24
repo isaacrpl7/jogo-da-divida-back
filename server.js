@@ -69,8 +69,6 @@ wss.on('connection', function connection(ws, req, clt) {
             const user_room = users[user].room;
             // Checar se foi do usuário do turno atual mesmo
             if(turn_per_room[user_room][0] === user) {
-                // Always normalize the turn (can't have duplicates)
-                turn_per_room[user_room] = returnToNormalTurn(turn_per_room[user_room])
                 nextTurn(user_room)
             }
         }
@@ -120,7 +118,7 @@ wss.on('connection', function connection(ws, req, clt) {
                     room_broadcast(user_room, {protocol: "ACTION_STACK_REMOVE", executeActionsBefore: false})
                 }
 
-                /** VERIFICAR QUAL CARTA FOI E REALIZAR A AÇÃO DEPENDENDO DA CARTA... TODO */
+                /** VERIFICAR QUAL CARTA FOI E REALIZAR A AÇÃO DEPENDENDO DA CARTA */
                 if(message["card_id"] === 16 || message["card_id"] === 17) { // CARTA DE IMPEDIR DE USAR AÇÃO
                     room_broadcast(user_room, {protocol: "CARD_ACTION", action: "BLOCK_ACTIONS"})
                 }
@@ -144,7 +142,8 @@ wss.on('connection', function connection(ws, req, clt) {
                 }
                 // CARTA DE PULAR O TURNO E O PRÓXIMO TER DOIS TURNOS
                 if(message["card_id"] === 22) {
-                    nextTurn(user_room, turn_per_room[user_room][1])
+                    const turn = turn_per_room[user_room]
+                    nextTurn(user_room, turn[turn.length-1])
                 }
 
             }
@@ -170,9 +169,11 @@ wss.on('connection', function connection(ws, req, clt) {
         if(userRoom) { // Se usuário está em uma sala
             delete rooms[userRoom][user]
 
-            // Delete the user that got out from the turn
-            const index_user_in_turn = turn_per_room[userRoom].indexOf(user)
-            turn_per_room[userRoom].splice(index_user_in_turn, 1)
+            // Delete the user that got out from the turn (if game has already started)
+            if(turn_per_room[userRoom]) {
+                const index_user_in_turn = turn_per_room[userRoom].indexOf(user)
+                turn_per_room[userRoom].splice(index_user_in_turn, 1)
+            }
 
             console.log(`Usuário ${user} foi removido da sala ${userRoom}`)
             room_broadcast(userRoom, {protocol: 'USER_LEFT', users: Object.keys(rooms[userRoom]).map((user) => `${user} está na sala!`)})
@@ -257,25 +258,41 @@ function warnPlayersAboutTurn(room, currentPlayer) {
 }
 
 function nextTurn(room, userPlayingNext=null) {
+    console.log(turn_per_room[room], 'Before next turn')
+    const turn = turn_per_room[room];
+    let pass_and_double_next = false
     if(!userPlayingNext){
-        const next_player = turn_per_room[room].pop()
-        turn_per_room[room].unshift(next_player)
+        const next_player = turn.pop()
+        turn.unshift(next_player)
     } else { // Caso o turno seja delegado por um obstáculo, coloca o novo jogador no inicio do turno para indicar que o turno é dele (qnd ele passar o turno, remover)
-        turn_per_room[room].unshift(userPlayingNext)
+        // Se o usuário atual for igual ao próximo usuário, é pq a carta de passar turno e dobrar foi usada
+        if(userPlayingNext === turn[0]) {
+            userPlayingNext = turn[turn.length - 2]
+            turn[turn.length-1] = userPlayingNext
+            pass_and_double_next = true
+            userPlayingNext = turn[0]
+        } else {
+            turn.unshift(userPlayingNext)
+        }
+    }
+
+    // When the turn passes, see if the last player is in the queue, and remove it (can't have duplicates)
+    if(!pass_and_double_next){
+        returnToNormalTurn(turn)
     }
 
     // Os que estão na sala, mas já morreram/estão presos
-    let locked_or_deads = Object.keys(rooms[room]).filter(x => !turn_per_room[room].includes(x));
+    let locked_or_deads = Object.keys(rooms[room]).filter(x => !turn.includes(x));
 
     if(userPlayingNext) {
         warnPlayersAboutTurn(room, userPlayingNext)
     } else {
-        warnPlayersAboutTurn(room, turn_per_room[room][0])
+        warnPlayersAboutTurn(room, turn[0])
     }
 
     // Avisa a todos os mortos e presos de quem é o turno
     locked_or_deads.forEach((player)=>{
-        rooms[room][player]['ws'].send(JSON.stringify({protocol: "THEIR_TURN", current_player: userPlayingNext ? userPlayingNext : turn_per_room[room][0]}))
+        rooms[room][player]['ws'].send(JSON.stringify({protocol: "THEIR_TURN", current_player: userPlayingNext ? userPlayingNext : turn[0]}))
     })
 }
 
