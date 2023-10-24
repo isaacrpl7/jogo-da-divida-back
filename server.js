@@ -258,7 +258,6 @@ function warnPlayersAboutTurn(room, currentPlayer) {
 }
 
 function nextTurn(room, userPlayingNext=null) {
-    console.log(turn_per_room[room], 'Before next turn')
     const turn = turn_per_room[room];
     let pass_and_double_next = false
     if(!userPlayingNext){
