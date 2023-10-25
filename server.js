@@ -234,7 +234,7 @@ app.get('/turno/:room', (req, res) => {
 
     // Distributing initial cards
     Object.keys(rooms[room]).forEach(player => {
-        // const initial_cards = [18,20,22]//DEBUG
+        const initial_cards = []//DEBUG
         for(let i=0; i<3;i++) {
             initial_cards.push(action_cards.pop())
         }
