@@ -234,17 +234,17 @@ app.get('/turno/:room', (req, res) => {
 
     // Distributing initial cards
     Object.keys(rooms[room]).forEach(player => {
-        const initial_cards = [18,20,22]//DEBUG
-        // for(let i=0; i<3;i++) {
-        //     initial_cards.push(action_cards.pop())
-        // }
+        // const initial_cards = [18,20,22]//DEBUG
+        for(let i=0; i<3;i++) {
+            initial_cards.push(action_cards.pop())
+        }
         rooms[room][player]['ws'].send(JSON.stringify({protocol: "INITIAL_CARDS", cards: initial_cards}))
     });
 
     let cards = [...obstacles, ...action_cards]
     cards = shuffle(cards)
-    cards.push(27) //DEBUG
-    cards.push(28) //DEBUG
+    // cards.push(27) //DEBUG
+    // cards.push(28) //DEBUG
     cards_per_room[room] = cards
 
     turn_per_room[room] = shuffle(Object.keys(rooms[room]))
