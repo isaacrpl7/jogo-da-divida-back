@@ -203,7 +203,7 @@ wss.on('connection', function connection(ws, req, clt) {
         }
         delete users[user]
         console.log(`Usuário ${user} desconectou!`)
-        console.log(`Usuários presentes: ${rooms[user_room]}`)
+        console.log(`Usuários presentes: ${rooms[userRoom]}`)
     });
     // ws.send(JSON.stringify({ message: 'something' }));
 });
