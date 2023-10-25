@@ -86,6 +86,10 @@ wss.on('connection', function connection(ws, req, clt) {
                 } else {
                     room_broadcast(user_room, {protocol: "PLAYER_TOOK_CARD", card, player: user})
                 }
+
+                if(cards_per_room[user_room].length === 0) {
+                    room_broadcast(user_room, {protocol: "CARDS_OVER"})
+                }
             }
         }
 
@@ -99,8 +103,19 @@ wss.on('connection', function connection(ws, req, clt) {
             const user_room = users[user].room;
             room_broadcast(user_room, {protocol: "GAMEOVER", player: user})
             const user_turn = turn_per_room[user_room].indexOf(user)
-            turn_per_room[user_room].splice(user_turn,1)
-            if(!user_turn) nextTurn(user_room)
+
+            if(user_turn !== -1) {
+                turn_per_room[user_room].splice(user_turn,1)
+            } 
+
+            if(user_turn === 0) { //Se o usuário que perdeu era o que estava jogando, passar o turno
+                nextTurn(user_room)
+            }
+
+            if(turn_per_room[user_room].length === 1) {
+                const winner = turn_per_room[user_room][0]
+                room_broadcast(user_room, {protocol: 'WINNER', winner})
+            }
         }
 
         if(message["protocol"] == 'ACTION_STACK_ADD'){
