@@ -143,7 +143,7 @@ wss.on('connection', function connection(ws, req, clt) {
                 // CARTA DE PULAR O TURNO E O PRÓXIMO TER DOIS TURNOS
                 if(message["card_id"] === 22) {
                     const turn = turn_per_room[user_room]
-                    nextTurn(user_room, turn[turn.length-1])
+                    nextTurn(user_room, null, true)
                 }
 
             }
@@ -196,13 +196,15 @@ app.post('/criarSala', (req, res) => {
     const id = generateRoomId()
     const {user} = req.body
 
-    if(!rooms[id]) {
+    if(!rooms[id] && users[user]) {
         // Room contain room id and a dictionary, which contains the user name and their object
         rooms[id] = {[`${user}`]: users[user]}
         users[user]['room'] = id
         users[user]['ws'].send(JSON.stringify({protocol: "DELEGATE_START"}))
-    } else {
+    } else if(users[user]) {
         res.send({msg: 'Sala já existe'})
+    } else {
+        res.send({msg: 'Crie o usuário antes'})
     }
     res.send({id})
 })
@@ -257,26 +259,36 @@ function warnPlayersAboutTurn(room, currentPlayer) {
     })
 }
 
-function nextTurn(room, userPlayingNext=null) {
+function nextTurn(room, userPlayingNext=null, doNextPlayerHaveTwoTurns=false) {
+    /** userPlayingNext e doNextPlayerHaveTwoTurns não devem ser usados ao mesmo tempo. Um é usado para ceder o turno para alguém (cartas de obstáculos)
+     * o outro é usado para o próximo jogador ter dois turnos e pular o turno do atual (dobro a passo pro próximo)
+     */
     const turn = turn_per_room[room];
     let pass_and_double_next = false
-    if(!userPlayingNext){
+    if(!userPlayingNext && !doNextPlayerHaveTwoTurns){
         const next_player = turn.pop()
         turn.unshift(next_player)
-    } else { // Caso o turno seja delegado por um obstáculo, coloca o novo jogador no inicio do turno para indicar que o turno é dele (qnd ele passar o turno, remover)
-        // Se o usuário atual for igual ao próximo usuário, é pq a carta de passar turno e dobrar foi usada
-        if(userPlayingNext === turn[0]) {
-            userPlayingNext = turn[turn.length - 2]
-            turn[turn.length-1] = userPlayingNext
-            pass_and_double_next = true
-            userPlayingNext = turn[0]
+    } else { // Caso o turno seja cedido para alguém, coloca o novo jogador no inicio do turno para indicar que o turno é dele (qnd ele passar o turno, remover)
+        // Se a carta de dobrar e passar pro próximo foi usada somente uma vez, adicionar o próximo jogador (o último da fila) no início da fila, 
+        // pra indicar que o turno agora é dele e ele terá dois turnos. Caso ela tenha sido usada duas vezes seguidas, quem usou vai pular um turno
+        // e o próximo terá dois (portanto, basta apenas mudar o último da fila pra ser igual ao penúltimo).
+        if(doNextPlayerHaveTwoTurns && !userPlayingNext){
+            if(turn[turn.length-1] === turn[0]) {
+                userPlayingNext = turn[turn.length - 2]
+                turn[turn.length-1] = userPlayingNext
+                pass_and_double_next = true
+                userPlayingNext = turn[0]
+            } else {
+                userPlayingNext = turn[turn.length-1]
+                turn.unshift(userPlayingNext)
+            }
         } else {
             turn.unshift(userPlayingNext)
         }
     }
 
     // When the turn passes, see if the last player is in the queue, and remove it (can't have duplicates)
-    if(!pass_and_double_next){
+    if(!pass_and_double_next){// To solve some edge cases
         returnToNormalTurn(turn)
     }
 
