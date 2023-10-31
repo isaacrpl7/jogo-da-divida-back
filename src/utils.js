@@ -39,4 +39,24 @@ function returnToNormalTurn(turn) {
     return turn
 }
 
-module.exports = {generateRoomId, shuffle, returnToNormalTurn}
+function isActionCard(card_id) {
+    if(card_id <= 23) return true
+    else return false
+}
+
+function isBadObstacleCard(card_id) {
+    if(card_id >= 24 && card_id <= 63) return true
+    else return false
+}
+
+function isBonusObstacleCard(card_id) {
+    if(card_id >= 64 && card_id <= 84) return true
+    else return false
+}
+
+function isJobCard(card_id) {
+    if(card_id >= 85 && card_id <= 94) return true
+    else return false
+}
+
+module.exports = {generateRoomId, shuffle, returnToNormalTurn, isActionCard, isBadObstacleCard, isBonusObstacleCard, isJobCard}
