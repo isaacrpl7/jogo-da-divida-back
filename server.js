@@ -9,7 +9,8 @@ const {MongoDBConnection} = require('./src/database/mongodb.js')
 const {MongoUserController} = require('./src/controllers/MongoDB/MongoUserController.js');
 const { MemoryUserController } = require('./src/controllers/Memory/MemoryUserController.js');
 const { MemoryRoomController } = require('./src/controllers/Memory/MemoryRoomController.js');
-const {UserActions} = require('./src/UserActions.js')
+const {UserActions} = require('./src/UserActions.js');
+const { RoomActions } = require('./src/RoomActions.js');
 
 
 config();
@@ -20,15 +21,6 @@ const server = createServer(app)
 const port = 3030
 const wss = new WebSocketServer({ server });
 
-// const DatabaseConnection = new MongoDBConnection()
-let userController = new MemoryUserController();
-let roomController = new MemoryRoomController(userController);
-const userActions = new UserActions(userController, roomController)
-// DatabaseConnection.connectToCluster(`mongodb+srv://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@${process.env.MONGODB_CLUSTER_NAME}.wbtnp9r.mongodb.net/?retryWrites=true&w=majority`)
-// .then(() => {
-//     userController = new MongoUserController(DatabaseConnection.getConnection());
-// })
-
 const cards_per_room = {
     //room_name: [card_array],
 }
@@ -36,6 +28,17 @@ const cards_per_room = {
 const turn_per_room = {
     //room_name: [players_name_array],
 }
+
+// const DatabaseConnection = new MongoDBConnection()
+let userController = new MemoryUserController();
+let roomController = new MemoryRoomController(userController);
+const userActions = new UserActions(userController, roomController)
+const roomActions = new RoomActions(userController, roomController, turn_per_room, cards_per_room)
+// DatabaseConnection.connectToCluster(`mongodb+srv://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@${process.env.MONGODB_CLUSTER_NAME}.wbtnp9r.mongodb.net/?retryWrites=true&w=majority`)
+// .then(() => {
+//     userController = new MongoUserController(DatabaseConnection.getConnection());
+// })
+
 
 wss.on('connection', function connection(ws, req, clt) {
     ws.on('error', console.error);
@@ -64,18 +67,24 @@ wss.on('connection', function connection(ws, req, clt) {
         const message = JSON.parse(data)
 
         if(message["protocol"] === 'ENTER_ROOM') {
-            const room = message["room"]
+            const newRoom = message["room"]
 
-            if(!roomController.checkRoomAlreadyExists({room_id: room})) {// Se a sala não existe
+            if(!roomController.checkRoomAlreadyExists({room_id: newRoom})) {// Se a sala não existe
                 ws.send(JSON.stringify({protocol: 'ENTER_ROOM_FAILED', msg: 'Sala não existe'}))
             } else {
                 // Se a sala que está entrando for uma outra sala
-                if(userController.getUserRoom({user_token}) !== room) {
-                    if(!roomController.getGameBegun({room_id: room})){
-                        roomController.addUserToRoom({room_id: room, user_token})
-                        console.log(`Usuário ${user_name} entrou com sucesso na sala ${room}`)
-                        roomController.setAlivePlayers({room_id: room, alivePlayers: roomController.getArrUsersNamesInRoom({room_id: room})})
-                        roomController.room_broadcast(room, {protocol: 'USER_ENTERED', users: roomController.getArrUsersNamesInRoom({room_id: room}).map((user) => `${user}`)})
+                const current_user_room = userController.getUserRoom({user_token})
+                if(current_user_room !== newRoom) {
+                    if(!roomController.getGameBegun({room_id: newRoom})){
+                        // Remove da sala atual (se ele estiver em alguma)
+                        if(current_user_room){
+                            roomActions.userLeftRoom({user_token, room_id: current_user_room})
+                        }
+                        // Adiciona na nova
+                        roomController.addUserToRoom({room_id: newRoom, user_token})
+                        console.log(`Usuário ${user_name} entrou com sucesso na sala ${newRoom}`)
+                        roomController.setAlivePlayers({room_id: newRoom, alivePlayers: roomController.getArrUsersNamesInRoom({room_id: newRoom})})
+                        roomController.room_broadcast(newRoom, {protocol: 'USER_ENTERED', users: roomController.getArrUsersNamesInRoom({room_id: newRoom}).map((user) => `${user}`)})
                     } else {
                         ws.send(JSON.stringify({protocol: 'ENTER_ROOM_FAILED', msg: 'Jogo já começou!'}))
                     }
@@ -307,35 +316,18 @@ wss.on('connection', function connection(ws, req, clt) {
 
     });
 
-    ws.on('close', async () => {
+    ws.on('close', async (event) => {
         const userRoom = userController.getUserRoom({user_token})
+        console.log(`Usuario saiu com codigo ${event.code}`)
         // await userController.removeUser({name: user, token})
         if(userRoom) { // Se usuário está em uma sala
             userController.disconnectUser({user_token})
             console.log(`Usuário ${user_name} foi desconectado!`)
             let waitForUserReconnection = setTimeout(() => {
-                roomController.removeUserFromRoom({user_token, room_id: userRoom})
-    
-                // Delete the user that got out from the turn (if game has already started)
-                if(turn_per_room[userRoom]) {
-                    const index_user_in_turn = turn_per_room[userRoom].indexOf(user_name)
-                    turn_per_room[userRoom].splice(index_user_in_turn, 1)
-                }
-    
-                console.log(`Usuário ${user_name} foi removido da sala ${userRoom}`)
-                roomController.setAlivePlayers({room_id: userRoom, alivePlayers: roomController.getArrUsersNamesInRoom({room_id: userRoom})})
-                roomController.room_broadcast(userRoom, {protocol: 'USER_LEFT', 
-                users: roomController.getArrUsersNamesInRoom({room_id: userRoom}).map((user) => `${user}`), user_leaving: user_name})
-                setTimeout(() => {
-                    if(roomController.checkRoomAlreadyExists({room_id: userRoom}) && roomController.getArrUsersNamesInRoom({room_id: userRoom}).length === 0) {
-                        roomController.removeRoom({room_id: userRoom})
-                        delete cards_per_room[userRoom]
-                        delete turn_per_room[userRoom]
-                        console.log(`Sala ${userRoom} foi excluída por estar vazia`)
-                    }
-                }, 5000)
+                // Se o estado do usuário for connected: false por mais de 30 segundos, ele remove da sala atual e remove o usuário
+                roomActions.userLeftRoom({user_token, room_id: userRoom})
                 userController.removeUser({user_token})
-                console.log(`Usuário ${user_name} foi removido!`)
+                console.log(`Usuário ${user_name} foi removido da lista de usuários e de sua sala!`)
             }, 30000)
             
             let checkUserReconnection = setInterval(() => {
@@ -369,7 +361,6 @@ app.post('/criarSala', (req, res) => {
     if(!roomController.checkRoomAlreadyExists({room_id: id}) && userController.checkUserAlreadyExists({user_token: user})) {
         // Room contain room id and a dictionary, which contains the user name and their object
         roomController.createRoom({room_id: id})
-        roomController.addUserToRoom({user_token: user, room_id: id})
         userController.getUserConnection({user_token: user}).send(JSON.stringify({protocol: "DELEGATE_START"}))
         console.log('Adicionou o usuario na sala e enviou o delegate start')
         res.send({id})

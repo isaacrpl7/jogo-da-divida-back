@@ -125,6 +125,9 @@ class MemoryRoomController {
         this.room_broadcast(room_id, {protocol: 'SET_GAME_BEGUN', gameBegun})
     }
     getGameBegun({room_id}) {
+        if(!this.rooms_state[room_id]){
+            return null
+        }
         return this.rooms_state[room_id].gameBegun
     }
     
