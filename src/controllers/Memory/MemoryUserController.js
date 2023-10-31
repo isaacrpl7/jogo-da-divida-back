@@ -71,7 +71,7 @@ class MemoryUserController {
 
     getUser({user_token}){
         if(this.users[user_token] === undefined){
-            throw Error('User does not exist!')
+            return null
         }
         return this.users[user_token]
     }
@@ -96,6 +96,22 @@ class MemoryUserController {
         this.users[user_token].connected = false
     }
 
+    connectUser({user_token, ws}){
+        this.users[user_token].connected = true
+        this.users[user_token].ws = ws
+    }
+
+    sendState({user_token}){
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_MY_HAND', myHand: this.getMyHand({user_token})}))
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_MY_TURN', myTurn: this.getMyTurn({user_token})}))
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_MY_CURRENT_OBSTACLE', myCurrentObstacle: this.getMyCurrentObstacle({user_token})}))
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_TAKEN_CARD', takenCard: this.getTakenCard({user_token})}))
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_THEIR_TURN', theirTurn: this.getTheirTurn({user_token})}))
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_MYSTERIOUS_PRESENT', mysteriousPresent: this.getMysteriousPresent({user_token})}))
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_NO_NEED_TO_DRAW_CARD', noNeedToDrawCard: this.getNoNeedToDrawCard({user_token})}))
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_TRANSFER_PYRAMID_VISIBLE', transferPyramidVisible: this.getTransferPyramidVisible({user_token})}))
+    }
+
     removeUser({ user_token }) {
         delete this.users[user_token]
         delete this.users_state[user_token]
@@ -104,6 +120,7 @@ class MemoryUserController {
     /** GETTERS AND SETTERS */
     setMyHand({user_token, myHand}){
         this.users_state[user_token].myHand = myHand
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_MY_HAND', myHand}))
     }
     getMyHand({user_token}) {
         return this.users_state[user_token].myHand
@@ -111,6 +128,7 @@ class MemoryUserController {
 
     setMyTurn({user_token, myTurn}){
         this.users_state[user_token].myTurn = myTurn
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_MY_TURN', myTurn}))
     }
     getMyTurn({user_token}){
         return this.users_state[user_token]
@@ -118,6 +136,7 @@ class MemoryUserController {
 
     setMyCurrentObstacle({user_token, myCurrentObstacle}){
         this.users_state[user_token].myCurrentObstacle = myCurrentObstacle
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_MY_CURRENT_OBSTACLE', myCurrentObstacle}))
     }
     getMyCurrentObstacle({user_token}){
         return this.users_state[user_token].myCurrentObstacle
@@ -125,6 +144,7 @@ class MemoryUserController {
 
     setTakenCard({user_token, takenCard}){
         this.users_state[user_token].takenCard = takenCard
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_TAKEN_CARD', takenCard}))
     }
     getTakenCard({user_token}){
         return this.users_state[user_token].takenCard
@@ -132,6 +152,7 @@ class MemoryUserController {
 
     setTheirTurn({user_token, theirTurn}){
         this.users_state[user_token].theirTurn = theirTurn
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_THEIR_TURN', theirTurn}))
     }
     getTheirTurn({user_token}){
         return this.users_state[user_token].theirTurn
@@ -139,6 +160,7 @@ class MemoryUserController {
 
     setMysteriousPresent({user_token, mysteriousPresent}){
         this.users_state[user_token].mysteriousPresent = mysteriousPresent
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_MYTERIOUS_PRESENT', mysteriousPresent}))
     }
     getMysteriousPresent({user_token}){
         return this.users_state[user_token].mysteriousPresent
@@ -146,6 +168,7 @@ class MemoryUserController {
 
     setNoNeedToDrawCard({user_token, noNeedToDrawCard}){
         this.users_state[user_token].noNeedToDrawCard = noNeedToDrawCard
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_NO_NEED_TO_DRAW_CARD', noNeedToDrawCard}))
     }
     getNoNeedToDrawCard({user_token}){
         return this.users_state[user_token].noNeedToDrawCard
@@ -153,6 +176,7 @@ class MemoryUserController {
 
     setTransferPyramidVisible({user_token, transferPyramidVisible}){
         this.users_state[user_token].transferPyramidVisible = transferPyramidVisible
+        this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_TRANSFER_PYRAMID_VISIBLE', transferPyramidVisible}))
     }
     getTransferPyramidVisible({user_token}){
         return this.users_state[user_token].transferPyramidVisible
