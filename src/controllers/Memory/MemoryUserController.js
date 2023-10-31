@@ -84,6 +84,9 @@ class MemoryUserController {
     }
 
     getUserRoom({user_token}){
+        if(this.users[user_token] === undefined){
+            return null
+        }
         const user_room = this.users[user_token].room_id
         return user_room
     }
@@ -94,6 +97,10 @@ class MemoryUserController {
 
     disconnectUser({ user_token }) {
         this.users[user_token].connected = false
+    }
+
+    isConnected({user_token}){
+        return this.users[user_token].connected
     }
 
     connectUser({user_token, ws}){

@@ -43,7 +43,8 @@ wss.on('connection', function connection(ws, req, clt) {
     // Creating user
     const queries = req.url.split('?')[1].split('&')
     const user_name = queries[0].split('user=')[1]
-    let user_token = queries[0].split('user_token=')[1]
+    let user_token = queries[1].split('user_token=')[1]
+
     if(userController.checkUserAlreadyExists({user_token}) && userController.getUserRoom({user_token})){
         // Se o usuário existir e já estiver em uma sala, ele está apenas reconectando. Fazer as trocas necessárias nos estados de sala/usuário
         userController.connectUser({user_token, ws})
@@ -67,10 +68,14 @@ wss.on('connection', function connection(ws, req, clt) {
             if(!roomController.checkRoomAlreadyExists({room_id: room})) {// Se a sala não existe
                 ws.send(JSON.stringify({protocol: 'ENTER_ROOM_FAILED', msg: 'Sala não existe'}))
             } else {
-                roomController.addUserToRoom({room_id: room, user_token})
-                console.log(`Usuário ${user_name} entrou com sucesso na sala ${room}`)
-                roomController.setAlivePlayers({room_id: room, alivePlayers: roomController.getArrUsersNamesInRoom({room_id: room})})
-                roomController.room_broadcast(room, {protocol: 'USER_ENTERED', users: roomController.getArrUsersNamesInRoom({room_id: room}).map((user) => `${user}`)})
+                if(!roomController.getGameBegun({room_id: room})){
+                    roomController.addUserToRoom({room_id: room, user_token})
+                    console.log(`Usuário ${user_name} entrou com sucesso na sala ${room}`)
+                    roomController.setAlivePlayers({room_id: room, alivePlayers: roomController.getArrUsersNamesInRoom({room_id: room})})
+                    roomController.room_broadcast(room, {protocol: 'USER_ENTERED', users: roomController.getArrUsersNamesInRoom({room_id: room}).map((user) => `${user}`)})
+                } else {
+                    ws.send(JSON.stringify({protocol: 'ENTER_ROOM_FAILED', msg: 'Jogo já começou!'}))
+                }
             }
         }
 
@@ -301,6 +306,7 @@ wss.on('connection', function connection(ws, req, clt) {
         // await userController.removeUser({name: user, token})
         if(userRoom) { // Se usuário está em uma sala
             userController.disconnectUser({user_token})
+            console.log(`Usuário ${user_name} foi desconectado!`)
             let waitForUserReconnection = setTimeout(() => {
                 roomController.removeUserFromRoom({user_token, room_id: userRoom})
     
@@ -323,22 +329,26 @@ wss.on('connection', function connection(ws, req, clt) {
                     }
                 }, 5000)
                 userController.removeUser({user_token})
-            }, 15000)
+                console.log(`Usuário ${user_name} foi removido!`)
+            }, 30000)
             
             let checkUserReconnection = setInterval(() => {
                 const userReconnecting = userController.getUser({user_token})
                 if(!userReconnecting){
+                    console.log(`Usuário ${user_name} foi já removido, portanto, limpando a checagem de reconexão!`)
                     clearInterval(checkUserReconnection)
-                }
-                if(userReconnecting.connected){
-                    clearInterval(checkUserReconnection)
-                    clearTimeout(waitForUserReconnection)
+                } else {
+                    if(userController.isConnected({user_token})){
+                        console.log(`Usuário ${user_name} reconectou!`)
+                        clearInterval(checkUserReconnection)
+                        clearTimeout(waitForUserReconnection)
+                    }
                 }
             }, 1000)
         } else {
             userController.removeUser({user_token})
+            console.log(`Usuário ${user_name} foi removido por não ter sala!`)
         }
-        console.log(`Usuário ${user_name} desconectou!`)
         console.log(`Usuários presentes na sala ${userRoom}:`)
         roomController.getArrUsersNamesInRoom({room_id: userRoom}).forEach(_user => {
             console.log(_user)
@@ -399,13 +409,17 @@ app.get('/turno/:room', (req, res) => {
 
 app.get('/variables/:user_token', (req, res) => {
     const {user_token} = req.params
-    const room_id = userController.getUserRoom({user_token})
-    res.json({
-        'room_state': roomController.getRoomState({room_id}),
-        'user_state': userController.getUserState({user_token}),
-        'cards_remaining': cards_per_room[room_id],
-        'turns': turn_per_room[room_id]
-    })
+    if(userController.getUser({user_token})){
+        const room_id = userController.getUserRoom({user_token})
+        res.json({
+            'room_state': roomController.getRoomState({room_id}),
+            'user_state': userController.getUserState({user_token}),
+            'cards_remaining': cards_per_room[room_id],
+            'turns': turn_per_room[room_id]
+        })
+    } else {
+        res.json({msg: 'User does not exist!'})
+    }
 })
 
 app.get('/', (req, res) => {
