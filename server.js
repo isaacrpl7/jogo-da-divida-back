@@ -3,13 +3,13 @@ const cors = require('cors');
 const { WebSocketServer } = require('ws')
 const app = express()
 const { createServer } = require('http')
-const { generateRoomId, shuffle, returnToNormalTurn, isActionCard } = require('./utils.js')
+const { generateRoomId, shuffle, returnToNormalTurn, isActionCard } = require('./src/utils.js')
 const { config } = require('dotenv')
-const {MongoDBConnection} = require('./database/mongodb.js')
-const {MongoUserController} = require('./controllers/MongoDB/MongoUserController.js');
-const { MemoryUserController } = require('./controllers/Memory/MemoryUserController.js');
-const { MemoryRoomController } = require('./controllers/Memory/MemoryRoomController.js');
-const {UserActions} = require('./UserActions.js')
+const {MongoDBConnection} = require('./src/database/mongodb.js')
+const {MongoUserController} = require('./src/controllers/MongoDB/MongoUserController.js');
+const { MemoryUserController } = require('./src/controllers/Memory/MemoryUserController.js');
+const { MemoryRoomController } = require('./src/controllers/Memory/MemoryRoomController.js');
+const {UserActions} = require('./src/UserActions.js')
 
 
 config();
