@@ -192,9 +192,11 @@ wss.on('connection', function connection(ws, req, clt) {
 
             // SE FOR A CARTA DE TÔ FORA (Basta ela estar na pilha de cartas de ações para impedir o jogador de puxar carta)
             if(message["card_id"] === 20 || message["card_id"] === 21) {
-                if(userController.getMyTurn({user_token})) {
-                    userController.setNoNeedToDrawCard({user_token, noNeedToDrawCard: true})
-                }
+                roomController.getArrUsersTokensInRoom({room_id: user_room}).forEach((token) => {
+                    if(userController.getMyTurn({user_token: token})) {
+                        userController.setNoNeedToDrawCard({user_token: token, noNeedToDrawCard: true})
+                    }
+                })
             }
 
             roomController.setActionsStack({room_id: user_room, actionsStack: [...roomController.getActionsStack({room_id: user_room}), message["card_id"]]})
