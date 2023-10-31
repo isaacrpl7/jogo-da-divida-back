@@ -45,12 +45,12 @@ wss.on('connection', function connection(ws, req, clt) {
     const user_name = queries[0].split('user=')[1]
     let user_token = queries[1].split('user_token=')[1]
 
-    if(userController.checkUserAlreadyExists({user_token}) && userController.getUserRoom({user_token}) && !userController.isConnected({user_token})){
+    if(userController.checkUserAlreadyExists({user_token}) && userController.getUserRoom({user_token}) && !userController.isConnected({user_token})) {
         // Se o usuário existir e já estiver em uma sala, ele está apenas reconectando. Fazer as trocas necessárias nos estados de sala/usuário
         userController.connectUser({user_token, ws})
         userController.sendState({user_token})
         roomController.sendRoomStateToUser({room_id: userController.getUserRoom({user_token}), user_token})
-    } else if(userController.checkUserAlreadyExists({user_token})){
+    } else if(userController.checkUserAlreadyExists({user_token}) && !userController.isConnected({user_token})) {
         // Se o usuário nao estiver em nenhuma sala, mas já existir (está reconectando tambem)
         userController.connectUser({user_token, ws})
     } else {
