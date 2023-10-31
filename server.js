@@ -69,13 +69,16 @@ wss.on('connection', function connection(ws, req, clt) {
             if(!roomController.checkRoomAlreadyExists({room_id: room})) {// Se a sala não existe
                 ws.send(JSON.stringify({protocol: 'ENTER_ROOM_FAILED', msg: 'Sala não existe'}))
             } else {
-                if(!roomController.getGameBegun({room_id: room})){
-                    roomController.addUserToRoom({room_id: room, user_token})
-                    console.log(`Usuário ${user_name} entrou com sucesso na sala ${room}`)
-                    roomController.setAlivePlayers({room_id: room, alivePlayers: roomController.getArrUsersNamesInRoom({room_id: room})})
-                    roomController.room_broadcast(room, {protocol: 'USER_ENTERED', users: roomController.getArrUsersNamesInRoom({room_id: room}).map((user) => `${user}`)})
-                } else {
-                    ws.send(JSON.stringify({protocol: 'ENTER_ROOM_FAILED', msg: 'Jogo já começou!'}))
+                // Se a sala que está entrando for uma outra sala
+                if(userController.getUserRoom({user_token}) !== room) {
+                    if(!roomController.getGameBegun({room_id: room})){
+                        roomController.addUserToRoom({room_id: room, user_token})
+                        console.log(`Usuário ${user_name} entrou com sucesso na sala ${room}`)
+                        roomController.setAlivePlayers({room_id: room, alivePlayers: roomController.getArrUsersNamesInRoom({room_id: room})})
+                        roomController.room_broadcast(room, {protocol: 'USER_ENTERED', users: roomController.getArrUsersNamesInRoom({room_id: room}).map((user) => `${user}`)})
+                    } else {
+                        ws.send(JSON.stringify({protocol: 'ENTER_ROOM_FAILED', msg: 'Jogo já começou!'}))
+                    }
                 }
             }
         }
