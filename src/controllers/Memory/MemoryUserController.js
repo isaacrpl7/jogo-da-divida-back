@@ -45,7 +45,7 @@ class MemoryUserController {
                 theirTurn: '',
                 mysteriousPresent: false,
                 noNeedToDrawCard: false,
-                transferPyramidVisible: false
+                transferPyramidVisible: false,
             }
         }
         return token
@@ -56,6 +56,10 @@ class MemoryUserController {
         Object.keys(this.users).forEach((user) => {
             console.log(`${user} possui o nome ${this.users[user].name}`)
         })
+    }
+
+    setUserName({user_token, user_name}){
+        this.users[user_token].name = user_name
     }
 
     getUserState({user_token}) {
@@ -138,7 +142,7 @@ class MemoryUserController {
         this.getUserConnection({user_token}).send(JSON.stringify({protocol: 'SET_MY_TURN', myTurn}))
     }
     getMyTurn({user_token}){
-        return this.users_state[user_token]
+        return this.users_state[user_token].myTurn
     }
 
     setMyCurrentObstacle({user_token, myCurrentObstacle}){

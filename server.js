@@ -49,18 +49,16 @@ wss.on('connection', function connection(ws, req, clt) {
     let user_token = queries[1].split('user_token=')[1]
 
     if(userController.checkUserAlreadyExists({user_token}) && userController.getUserRoom({user_token}) && !userController.isConnected({user_token})) {
-        // Se o usuário existir e já estiver em uma sala, ele está apenas reconectando. Fazer as trocas necessárias nos estados de sala/usuário
-        userController.connectUser({user_token, ws})
-        userController.sendState({user_token})
-        roomController.sendRoomStateToUser({room_id: userController.getUserRoom({user_token}), user_token})
+        // O usuário reconectou e já está em uma sala. Se ele estiver apenas acessando a página inicial (sem numero de sala no link), redirecionar ele para a sua sala
     } else if(userController.checkUserAlreadyExists({user_token}) && !userController.isConnected({user_token})) {
         // Se o usuário nao estiver em nenhuma sala, mas já existir (está reconectando tambem)
+        if(user_name !== userController.getUser({user_token}).name) userController.setUserName({user_token, user_name})
         userController.connectUser({user_token, ws})
     } else {
         // Se não existir, criar um novo usuário
         user_token = userController.createUser({name: user_name, ws})
         ws.send(JSON.stringify({protocol: 'CREATING_USER', token: user_token}))
-        console.log(`Usuário ${user_name} conectou!`)
+        console.log(`Usuário ${user_name} foi criado e conectou!`)
     }
 
     ws.on('message', function message(data) {
@@ -68,28 +66,8 @@ wss.on('connection', function connection(ws, req, clt) {
 
         if(message["protocol"] === 'ENTER_ROOM') {
             const newRoom = message["room"]
-
-            if(!roomController.checkRoomAlreadyExists({room_id: newRoom})) {// Se a sala não existe
-                ws.send(JSON.stringify({protocol: 'ENTER_ROOM_FAILED', msg: 'Sala não existe'}))
-            } else {
-                // Se a sala que está entrando for uma outra sala
-                const current_user_room = userController.getUserRoom({user_token})
-                if(current_user_room !== newRoom) {
-                    if(!roomController.getGameBegun({room_id: newRoom})){
-                        // Remove da sala atual (se ele estiver em alguma)
-                        if(current_user_room){
-                            roomActions.userLeftRoom({user_token, room_id: current_user_room})
-                        }
-                        // Adiciona na nova
-                        roomController.addUserToRoom({room_id: newRoom, user_token})
-                        console.log(`Usuário ${user_name} entrou com sucesso na sala ${newRoom}`)
-                        roomController.setAlivePlayers({room_id: newRoom, alivePlayers: roomController.getArrUsersNamesInRoom({room_id: newRoom})})
-                        roomController.room_broadcast(newRoom, {protocol: 'USER_ENTERED', users: roomController.getArrUsersNamesInRoom({room_id: newRoom}).map((user) => `${user}`)})
-                    } else {
-                        ws.send(JSON.stringify({protocol: 'ENTER_ROOM_FAILED', msg: 'Jogo já começou!'}))
-                    }
-                }
-            }
+            console.log(`${user_name} mandou o enter room`)
+            roomActions.userEnterRoom({room_id: newRoom, user_token, user_name, ws})
         }
 
         if(message["protocol"] === 'NEXT_TURN'){
@@ -316,18 +294,17 @@ wss.on('connection', function connection(ws, req, clt) {
 
     });
 
-    ws.on('close', async (event) => {
+    ws.on('close', async () => {
         const userRoom = userController.getUserRoom({user_token})
-        console.log(`Usuario saiu com codigo ${event.code}`)
-        // await userController.removeUser({name: user, token})
+
         if(userRoom) { // Se usuário está em uma sala
             userController.disconnectUser({user_token})
-            console.log(`Usuário ${user_name} foi desconectado!`)
+            console.log(`Usuário ${user_name} desconectou!`)
+
             let waitForUserReconnection = setTimeout(() => {
                 // Se o estado do usuário for connected: false por mais de 30 segundos, ele remove da sala atual e remove o usuário
                 roomActions.userLeftRoom({user_token, room_id: userRoom})
-                userController.removeUser({user_token})
-                console.log(`Usuário ${user_name} foi removido da lista de usuários e de sua sala!`)
+                console.log(`Usuário ${user_name} foi removido de sua sala por não reconectar!`)
             }, 30000)
             
             let checkUserReconnection = setInterval(() => {
@@ -343,14 +320,13 @@ wss.on('connection', function connection(ws, req, clt) {
                     }
                 }
             }, 1000)
+
+            console.log(`Usuários presentes na sala ${userRoom}:`)
+            console.log(...roomController.getArrUsersNamesInRoom({room_id: userRoom}))
         } else {
-            userController.removeUser({user_token})
-            console.log(`Usuário ${user_name} foi removido por não ter sala!`)
+            userController.disconnectUser({user_token})
+            console.log(`Usuário ${user_name} foi desconectado. Não foi removido de nenhum sala, pois não está em nenhuma!`)
         }
-        console.log(`Usuários presentes na sala ${userRoom}:`)
-        roomController.getArrUsersNamesInRoom({room_id: userRoom}).forEach(_user => {
-            console.log(_user)
-        })
     });
     // ws.send(JSON.stringify({ message: 'something' }));
 });
@@ -361,15 +337,14 @@ app.post('/criarSala', (req, res) => {
     if(!roomController.checkRoomAlreadyExists({room_id: id}) && userController.checkUserAlreadyExists({user_token: user})) {
         // Room contain room id and a dictionary, which contains the user name and their object
         roomController.createRoom({room_id: id})
-        userController.getUserConnection({user_token: user}).send(JSON.stringify({protocol: "DELEGATE_START"}))
-        console.log('Adicionou o usuario na sala e enviou o delegate start')
+        roomController.setRoomAdminToken({roomAdminToken: user, room_id: id})
         res.send({id})
     } else if(userController.checkUserAlreadyExists({user_token: user})) {
-        console.log('Sala ja existe')
-        res.send({msg: 'Sala já existe'})
+        console.log('Não foi possível criar sala, ela ja existe')
+        res.send({msg: 'Não foi possível criar sala, ela ja existe'})
     } else {
-        console.log('Crie o usuario antes')
-        res.send({msg: 'Crie o usuário antes'})
+        console.log('Crie o usuario antes de criar uma sala')
+        res.send({msg: 'Crie o usuario antes de criar uma sala'})
     }
 })
 
